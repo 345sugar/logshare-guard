@@ -1,0 +1,2 @@
+include README.en.md SECURITY.md CONTRIBUTING.md CHANGELOG.md .pre-commit-hooks.yaml
+recursive-include examples *.jsonl
