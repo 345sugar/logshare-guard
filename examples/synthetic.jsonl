@@ -1,0 +1,2 @@
+{"event":"request","park_id":"demo-park","wait_minutes":25,"headers":{"Authorization":"Bearer SYNTHETIC_NOT_A_REAL_TOKEN","Cookie":"session=SYNTHETIC_COOKIE"},"url":"https://example.invalid/status?api_key=SYNTHETIC_KEY&lang=ja"}
+{"event":"debug","credentials":{"password":"SYNTHETIC_PASSWORD"},"headers":[{"name":"X-API-Key","value":"SYNTHETIC_HEADER_KEY"}],"url":"https://demo-user:SYNTHETIC_PASSWORD@example.invalid/logs#SYNTHETIC_FRAGMENT"}
