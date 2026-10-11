@@ -45,6 +45,34 @@ class CliTests(unittest.TestCase):
             {"api_key": "[REDACTED]", "ok": True}])
         self.assertEqual(source.read_text(encoding="utf-8"), original)
 
+    def test_control_obscured_urls_are_detected_and_fully_redacted(self):
+        urls = (
+            "\x00https://user:SYNTHETIC_PASSWORD@example.test/?api_key=SYNTHETIC_TOKEN",
+            "ht\ttps://user:SYNTHETIC_PASSWORD@example.test/?api_key=SYNTHETIC_TOKEN",
+            "ht\ntps://user:SYNTHETIC_PASSWORD@example.test/?api_key=SYNTHETIC_TOKEN",
+            "https\r://user:SYNTHETIC_PASSWORD@example.test/?api_key=SYNTHETIC_TOKEN",
+        )
+        for extension in ("json", "jsonl"):
+            for index, url in enumerate(urls):
+                with self.subTest(extension=extension, case=index):
+                    source = self.root / f"input-{index}.{extension}"
+                    output = self.root / f"output-{index}.{extension}"
+                    raw = json.dumps({"url": url, "status": "public"}) + "\n"
+                    source.write_text(raw, encoding="utf-8")
+                    code, out, err = self.run_cli("check", source)
+                    self.assertEqual(code, 1)
+                    self.assertEqual(json.loads(out)["rules"], {"invalid_url": 1})
+                    self.assertEqual(err, "")
+                    self.assertNotIn("SYNTHETIC_", out)
+                    code, out, err = self.run_cli("redact", source, "-o", output)
+                    self.assertEqual(code, 0)
+                    self.assertEqual(json.loads(out)["rules"], {"invalid_url": 1})
+                    self.assertEqual(json.loads(output.read_text(encoding="utf-8")),
+                                     {"url": "[REDACTED]", "status": "public"})
+                    self.assertEqual(err, "")
+                    self.assertNotIn("SYNTHETIC_", output.read_text(encoding="utf-8") + out)
+                    self.assertEqual(source.read_text(encoding="utf-8"), raw)
+
     def test_invalid_final_record_never_creates_partial_output_or_echoes_input(self):
         source, output = self.root / "input.jsonl", self.root / "output.jsonl"
         source.write_text('{"password":"PRIVATE"}\n{"PRIVATE_INVALID":', encoding="utf-8")

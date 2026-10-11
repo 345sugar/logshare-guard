@@ -190,6 +190,37 @@ class RedactTests(unittest.TestCase):
         self.assertEqual(parse_qsl(urlsplit(result.strip()).query), [("password", MARKER)])
         self.assertEqual(stats, {"url_query": 1})
 
+    def test_leading_c0_controls_cannot_hide_a_url(self):
+        url = "https://user:synthetic-password@example.test/?api_key=synthetic-token"
+        for codepoint in range(32):
+            with self.subTest(codepoint=codepoint):
+                result, stats = redact(chr(codepoint) + url)
+                self.assertEqual(result, MARKER)
+                self.assertEqual(stats, {"invalid_url": 1})
+
+    def test_parser_ignored_controls_cannot_hide_an_http_scheme(self):
+        for scheme in ("http", "https", "HtTpS"):
+            for control in "\t\r\n":
+                for position in range(1, len(scheme) + 1):
+                    with self.subTest(scheme=scheme, control=ord(control), position=position):
+                        candidate = (scheme[:position] + control + scheme[position:]
+                                     + "://user:synthetic-password@example.test/"
+                                     + "?token=synthetic-query#synthetic-fragment")
+                        result, stats = redact(candidate)
+                        self.assertEqual(result, MARKER)
+                        self.assertEqual(stats, {"invalid_url": 1})
+
+    def test_url_probe_does_not_extend_redaction_to_ordinary_prose(self):
+        for source in (
+            "\x00An ordinary message mentioning https://example.test/",
+            "ht\ttps appears in prose, without a URL scheme separator",
+            "A line\nhttps://example.test/?api_key=synthetic-token",
+        ):
+            with self.subTest(source=source):
+                result, stats = redact(source)
+                self.assertEqual(result, source)
+                self.assertEqual(stats, {})
+
     def test_ordinary_json_and_free_text_remain_unchanged(self):
         source = [
             {"park_id": "demo", "wait_time": 15, "open": True, "missing": None},

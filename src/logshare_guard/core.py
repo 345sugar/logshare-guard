@@ -41,6 +41,8 @@ DEFAULT_SENSITIVE_KEYS = (
 
 _HTTP_CANDIDATE = re.compile(r"^https?:", re.IGNORECASE)
 _INVALID_PERCENT = re.compile(r"%(?![0-9a-fA-F]{2})")
+_URL_LEADING_IGNORED = "".join(chr(code) for code in range(0x21))
+_URL_REMOVED_CONTROLS = str.maketrans("", "", "\t\r\n")
 
 
 def _normalize_key(key: str) -> str:
@@ -83,7 +85,14 @@ def redact(
 
     def redact_url(original: str) -> str:
         candidate = original.strip()
-        if not _HTTP_CANDIDATE.match(candidate):
+        # Recognize URLs even when controls obscure the scheme. URL parsers
+        # ignore leading C0/space and remove TAB/CR/LF anywhere. Use that
+        # cleanup only for classification; validate the original below so a
+        # malformed candidate is fully redacted instead of silently repaired.
+        scheme_candidate = candidate.lstrip(_URL_LEADING_IGNORED).translate(
+            _URL_REMOVED_CONTROLS
+        )
+        if not _HTTP_CANDIDATE.match(scheme_candidate):
             return original
 
         try:
