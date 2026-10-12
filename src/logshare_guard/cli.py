@@ -73,7 +73,8 @@ def _parser():
         description="Check or redact selected secret fields in local JSON/JSONL logs. "
                     "Free text and unknown fields still need manual review.")
     parser.add_argument("command", choices=("check", "redact"))
-    parser.add_argument("input", type=Path)
+    parser.add_argument("input", type=Path, nargs="+",
+                        help="One or more files for check; exactly one file for redact")
     parser.add_argument("--format", choices=("auto", "json", "jsonl"), default="auto")
     parser.add_argument("--secret-key", action="append", default=[], metavar="KEY",
                         help="Additional exact field name to redact; repeat as needed")
@@ -84,19 +85,28 @@ def _parser():
 
 def main(argv=None):
     parser = _parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_intermixed_args(argv)
     if args.command == "redact" and args.output is None:
         parser.error("redact requires --output")
     if args.command == "check" and args.output is not None:
         parser.error("--output is only supported for redact")
+    if args.command == "redact" and len(args.input) != 1:
+        parser.error("redact accepts exactly one input file")
     try:
-        records, format_name = _read_records(args.input, args.format)
         sanitized = []
         counts = Counter()
-        for record in records:
-            result, findings = redact(record, extra_keys=args.secret_key)
-            sanitized.append(result)
-            counts.update(findings)
+        record_count = 0
+        # Check files one at a time: the limit applies to each file and check
+        # does not retain redacted copies across the batch. Only report success
+        # after every input was parsed and checked successfully.
+        for path in args.input:
+            records, format_name = _read_records(path, args.format)
+            for record in records:
+                result, findings = redact(record, extra_keys=args.secret_key)
+                if args.command == "redact":
+                    sanitized.append(result)
+                counts.update(findings)
+            record_count += len(records)
         if args.command == "redact":
             if format_name == "jsonl":
                 output = "".join(json.dumps(record, ensure_ascii=True, allow_nan=False) + "\n"
@@ -108,7 +118,7 @@ def main(argv=None):
             # creation also protects the source and existing symlink/hardlink targets.
             with args.output.open("x", encoding="utf-8", newline="\n") as handle:
                 handle.write(output)
-        summary = {"command": args.command, "records": len(records),
+        summary = {"command": args.command, "files": len(args.input), "records": record_count,
                    "findings": sum(counts.values()), "rules": dict(sorted(counts.items()))}
         print(json.dumps(summary, sort_keys=True))
         return 1 if args.command == "check" and counts else 0

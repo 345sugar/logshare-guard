@@ -128,6 +128,114 @@ class CliTests(unittest.TestCase):
         source.write_text("{}", encoding="utf-8")
         self.assertEqual(self.run_cli("check", source)[0], 2)
 
+    def test_check_multiple_formats_aggregates_counts_without_values_or_paths(self):
+        first = self.root / "PRIVATE_FIRST.json"
+        second = self.root / "PRIVATE_SECOND.ndjson"
+        first.write_text('{"password":"PRIVATE_ONE"}', encoding="utf-8")
+        second.write_text('{"api_key":"PRIVATE_TWO"}\n{"wait":5}\n', encoding="utf-8")
+        originals = [path.read_bytes() for path in (first, second)]
+        code, out, err = self.run_cli("check", first, second)
+        self.assertEqual(code, 1)
+        self.assertEqual(json.loads(out), {
+            "command": "check", "files": 2, "records": 3,
+            "findings": 2, "rules": {"sensitive_key": 2}})
+        self.assertEqual(err, "")
+        self.assertNotIn("PRIVATE", out)
+        self.assertEqual([path.read_bytes() for path in (first, second)], originals)
+
+    def test_control_obscured_urls_in_mixed_batch_keep_security_and_error_contracts(self):
+        first = self.root / "SYNTHETIC_PRIVATE.json"
+        second = self.root / "SYNTHETIC_PRIVATE.jsonl"
+        first.write_text(json.dumps({
+            "url": "\x00https://user:SYNTHETIC_PASSWORD@example.test/"}), encoding="utf-8")
+        second.write_text(json.dumps({
+            "url": "ht\ttps://example.test/?token=SYNTHETIC_TOKEN"})
+            + '\n{"status":"public"}\n', encoding="utf-8")
+        originals = [path.read_bytes() for path in (first, second)]
+        for paths in ((first, second), (second, first)):
+            with self.subTest(paths=paths):
+                code, out, err = self.run_cli("check", *paths)
+                self.assertEqual(code, 1)
+                self.assertEqual(json.loads(out), {
+                    "command": "check", "files": 2, "records": 3,
+                    "findings": 2, "rules": {"invalid_url": 2}})
+                self.assertEqual(err, "")
+                self.assertNotIn("SYNTHETIC_", out)
+        self.assertEqual([path.read_bytes() for path in (first, second)], originals)
+        invalid = self.root / "SYNTHETIC_INVALID.json"
+        invalid.write_text('{"SYNTHETIC_INVALID":', encoding="utf-8")
+        for paths in ((first, second, invalid), (invalid, first, second)):
+            with self.subTest(paths=paths):
+                code, out, err = self.run_cli("check", *paths)
+                self.assertEqual(code, 2)
+                self.assertEqual(out, "")
+                self.assertNotIn("SYNTHETIC_", err)
+
+    def test_clean_batch_returns_zero(self):
+        paths = [self.root / "one.json", self.root / "two.jsonl"]
+        for path in paths:
+            path.write_text('{"wait":5}', encoding="utf-8")
+        code, out, err = self.run_cli("check", *paths)
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)["files"], 2)
+        self.assertEqual(json.loads(out)["records"], 2)
+        self.assertEqual(json.loads(out)["findings"], 0)
+        self.assertEqual(err, "")
+
+    def test_error_in_batch_takes_precedence_and_emits_no_partial_summary(self):
+        first = self.root / "PRIVATE_VALID.json"
+        second = self.root / "PRIVATE_INVALID.jsonl"
+        first.write_text('{"token":"PRIVATE"}', encoding="utf-8")
+        for contents in ('{"PRIVATE":', '{"x":1}\n{"PRIVATE":', None):
+            if contents is None:
+                second.unlink()
+            else:
+                second.write_text(contents, encoding="utf-8")
+            for paths in ((first, second), (second, first)):
+                with self.subTest(contents=contents, paths=paths):
+                    code, out, err = self.run_cli("check", *paths)
+                    self.assertEqual(code, 2)
+                    self.assertEqual(out, "")
+                    self.assertNotIn("PRIVATE", err)
+                    self.assertNotIn("Traceback", err)
+
+    def test_options_before_between_or_after_batch_paths(self):
+        first, second = self.root / "one.data", self.root / "two.data"
+        for path in (first, second):
+            path.write_text('{"tenantCredential":"PRIVATE"}\n{"wait":5}', encoding="utf-8")
+        options = ("--format", "jsonl", "--secret-key", "tenantCredential")
+        for args in ((*options, first, second), (first, *options, second), (first, second, *options)):
+            with self.subTest(args=args):
+                code, out, err = self.run_cli("check", *args)
+                self.assertEqual(code, 1)
+                self.assertEqual(json.loads(out)["records"], 4)
+                self.assertEqual(json.loads(out)["findings"], 2)
+                self.assertEqual(err, "")
+                self.assertNotIn("PRIVATE", out)
+
+    def test_redact_rejects_multiple_inputs_without_creating_output(self):
+        output = self.root / "output.json"
+        with self.assertRaises(SystemExit) as caught:
+            self.run_cli("redact", self.root / "one.json", self.root / "two.json", "-o", output)
+        self.assertEqual(caught.exception.code, 2)
+        self.assertFalse(output.exists())
+
+    def test_check_requires_an_input(self):
+        with self.assertRaises(SystemExit) as caught:
+            self.run_cli("check")
+        self.assertEqual(caught.exception.code, 2)
+
+    def test_hook_separator_treats_option_like_filenames_as_inputs(self):
+        names = ("-private.json", "--format=jsonl.json", "space name.JSONL")
+        for name in names:
+            (self.root / name).write_text('{"wait":5}', encoding="utf-8")
+        with contextlib.chdir(self.root):
+            code, out, err = self.run_cli("check", "--", *names)
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)["files"], 3)
+        self.assertEqual(json.loads(out)["records"], 3)
+        self.assertEqual(err, "")
+
 
 if __name__ == "__main__":
     unittest.main()

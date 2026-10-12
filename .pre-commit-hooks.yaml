@@ -1,0 +1,8 @@
+- id: logshare-guard
+  name: Check JSON logs for supported sensitive fields
+  entry: logshare-guard check
+  args: ['--']
+  language: python
+  types: [file]
+  files: '(?i)\.(json|jsonl|ndjson)$'
+  require_serial: true
