@@ -128,6 +128,9 @@ to its reviewed full SHA. Do not refer to a release tag that does not exist.
 - Whole-string HTTP(S) URLs: user information is removed; selected query values
   and fragments are redacted. Duplicate query keys, encoded keys, and `;`
   separators are handled. Invalid HTTP(S) URL candidates are replaced entirely.
+- URL candidates hidden by leading C0 control characters or TAB/CR/LF within
+  the scheme are also recognized; the original malformed string is replaced
+  entirely.
 
 Counts describe replacement locations, not unique secrets. A selected field
 containing an object counts once. Already redacted fields still count on later
