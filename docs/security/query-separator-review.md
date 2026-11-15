@@ -1,6 +1,6 @@
 # Semicolon query interpretation can retain sensitive values
 
-Status: maintainer review finding, identified 2026-11-15; no CVE or GHSA identifier assigned in this package. Source 0.2.1 at [commit `6f224719b003d9371f507bc60ba03af17837eda2`](https://github.com/345sugar/logshare-guard/commit/6f224719b003d9371f507bc60ba03af17837eda2), on the unmerged `codex/cve-evidence-review` branch, contains the candidate fix. This is pending release, not a claim that `main`, a GitHub release, or PyPI has been updated. Retain the working-source hashes in the evidence report as well as this commit identifier.
+Status: maintainer review finding, identified 2026-11-15; no CVE or GHSA identifier assigned to this separate issue in this package. Source 0.2.1 contains the fix introduced at [commit `6f224719b003d9371f507bc60ba03af17837eda2`](https://github.com/345sugar/logshare-guard/commit/6f224719b003d9371f507bc60ba03af17837eda2) and merged through PR #3 into [main at `0052c477861a14c1853b2c8bc4dee08fc5635d43`](https://github.com/345sugar/logshare-guard/commit/0052c477861a14c1853b2c8bc4dee08fc5635d43). No GitHub release or PyPI publication is asserted. Retain source hashes in the evidence reports as well as these commit identifiers. The CVE request for GHSA-8mpg-mvq9-qm96 concerns the older scheme-control issue, not this separate finding.
 
 This issue is distinct from [GHSA-8mpg-mvq9-qm96](GHSA-8mpg-mvq9-qm96.md). The older advisory concerns controls that hide the HTTP(S) scheme. This finding concerns how a normally recognized HTTP(S) URL's query is segmented. The two example URLs below contain no control characters and still reproduce after the older fix.
 
@@ -69,7 +69,7 @@ Under `&`-only parsing the key is `api;key`. The affected redactor splits it int
 
 ## Fix requirements and review status
 
-The candidate 0.2.1 fix covers both plausible query interpretations conservatively:
+The merged 0.2.1 source fix covers both plausible query interpretations conservatively:
 
 1. Identify a sensitive complete key within an `&`-delimited field before treating literal semicolons as legacy separators.
 2. If a sensitive value starts within such a field, remove its entire possible value through the end of that field; a semicolon must not expose a tail of that value.
@@ -85,9 +85,11 @@ The separate query evidence harness compares the pinned maintained 0.2.0 baselin
 python tools/reproduce_query_separator.py --output security-evidence/query-separator.json
 ```
 
-Use a new output path. Retain the exact source hashes, interpreter/OS, and expected/observed before-and-after results. The candidate fix commit and source version are recorded above; retain completed regression/CI results and record any future advisory identifier only after it exists. The older URL-control differential harness does not, by itself, verify this query-separator fix.
+Use a new output path. Retain the exact source hashes, interpreter/OS, and expected/observed before-and-after results. The fix and merge commits and source version are recorded above; retain completed regression/CI results and record any future advisory identifier only after it exists. The older URL-control differential harness does not, by itself, verify this query-separator fix.
 
 The local differential run reviewed on 2026-11-15 passed on CPython 3.12.10, Windows 11: two snapshots with eight core cases and eight CLI cases per snapshot, for 16 core observations and 32 CLI invocations. The baseline retained the expected synthetic values; the working fix removed them where required while preserving the encoded public controls. This is local evidence for those cases, not a completed cross-platform CI result or an independent audit. Re-run the harness for the exact source revision submitted for review.
+
+Separately, [main CI run 43711757313](https://github.com/345sugar/logshare-guard/actions/runs/43711757313) completed successfully in all six matrix jobs and produced evidence artifacts for the merged revision above.
 
 ## Impact and attribution limits
 

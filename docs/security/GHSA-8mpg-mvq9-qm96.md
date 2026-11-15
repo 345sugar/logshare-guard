@@ -2,7 +2,7 @@
 
 - Advisory: [GHSA-8mpg-mvq9-qm96](https://github.com/345sugar/logshare-guard/security/advisories/GHSA-8mpg-mvq9-qm96)
 - Product: `logshare-guard`, maintained by `345sugar`
-- Status: published maintainer advisory; no CVE identifier shown on the public advisory as checked on 2026-11-15
+- Status: published maintainer advisory; CVE request submitted through GitHub on 2026-11-15, with no CVE identifier or CNA acceptance observed
 - Document purpose: technical evidence for review of the existing advisory, not a new vulnerability announcement or an assertion of CVE eligibility.
 
 ## Summary
@@ -31,7 +31,7 @@ In the affected `redact_url` implementation, `original.strip()` is tested agains
 
 Python's documented URL parsing behavior removes TAB/CR/LF and, on supported interpreter revisions with the relevant behavior, leading C0 controls and spaces. This makes the early classification inconsistent with a consumer that recognizes the normalized URL. The disclosure reproducer records the actual interpreter instead of assuming identical normalization across every Python patch version. [Python URL parsing documentation](https://docs.python.org/3/library/urllib.parse.html#urllib.parse.urlsplit)
 
-**Proposed root-cause mapping: CWE-180, Incorrect Behavior Order: Validate Before Canonicalize.** This is a suggested mapping for CNA review: classification is used as a security gate before accounting for canonicalization. The consequence is retention of sensitive data in the proposed shared output. A generic log-insertion classification would obscure the root cause because this tool transforms an existing log rather than originating its credentials. [CWE-180](https://cwe.mitre.org/data/definitions/180.html)
+**Maintainer-selected root-cause mapping: CWE-180, Incorrect Behavior Order: Validate Before Canonicalize.** This mapping is selected in the published advisory and remains subject to CNA review: classification is used as a security gate before accounting for canonicalization. The consequence is retention of sensitive data in the proposed shared output. A generic log-insertion classification would obscure the root cause because this tool transforms an existing log rather than originating its credentials. [CWE-180](https://cwe.mitre.org/data/definitions/180.html)
 
 ## Preconditions and impact
 
@@ -89,6 +89,8 @@ A successful run proves the assertions encoded in that run on that environment. 
 
 The local run reviewed on 2026-11-15 used CPython 3.12.10 on Windows 11. It passed the expected-behavior assertions for five snapshots, with 198 core cases and 10 CLI cases (20 CLI invocations) per snapshot: 990 core observations and 100 CLI invocations in total. Each core set included 128 leading-control cases, 54 scheme-control cases, 12 combined cases, and four controls. These counts describe one local run, not independent review or cross-platform CI results. Fresh reports should be generated after changes to the harness or worktree.
 
+Separately, [main CI run 43711757313](https://github.com/345sugar/logshare-guard/actions/runs/43711757313) passed all six matrix jobs and produced evidence artifacts for merged-main commit `0052c477861a14c1853b2c8bc4dee08fc5635d43`. The public advisory links to the evidence package pinned to that revision.
+
 ## Remediation and remaining boundaries
 
 Update to a fixed source snapshot and repeat the redaction from the original input. The fix uses normalized input only to identify a URL candidate; it checks the original string and fully replaces malformed candidates. It does not silently repair and preserve a control-bearing URL.
@@ -104,7 +106,7 @@ The documented limits still apply: free-text secrets, unknown keys, secrets in k
 | 2026-10-10 | Git history records the initial implementation and the separate development snapshot listed above. Commit dates do not independently prove the first time each object was publicly accessible. |
 | 2026-10-11 | Git history records the 0.1.1 fix and merge. GitHub shows the public GHSA publication date as October 11. |
 | 2026-10-12 | The later 0.2.0 merge retains the security fix. |
-| 2026-11-15 | This evidence package was prepared for review of the already-published issue. |
+| 2026-11-15 | Evidence changes were merged through PR #3 and main CI passed. The published advisory was supplemented with pinned evidence links and CWE-180. The authenticated UI confirmed a CVE request, and the [timeline records the request](https://github.com/345sugar/logshare-guard/security/advisories/GHSA-8mpg-mvq9-qm96#event-1368234). No CVE number or acceptance was observed. |
 
 The publisher and project maintainer is [345sugar](https://github.com/345sugar). Discovery, reproduction, review, and patch preparation used AI assistance. This is a finding in the maintainer's own project; independent acceptance or third-party certification is not claimed. No company is attributed in this package. Any later attribution correction must describe actual contributions and dates, rather than imply that a company performed work before it existed.
 

@@ -55,23 +55,23 @@ The generated case family targets the historic bug, including control-character 
 - [ ] Confirm the report identifies every pinned Git commit and hash of the loaded source.
 - [ ] Check the vulnerable snapshot's false-negative `check` and unchanged secret-bearing `redact` output, not only an isolated regex result.
 - [ ] Check that fixed snapshots remove the affected URL while preserving independent public fields.
-- [ ] Run the normal unit tests and capture actual results. Confirm CI completion for each advertised OS/Python combination; distinguish local runs from CI.
+- [x] Confirm completed CI separately from local runs: [main run 43711757313](https://github.com/345sugar/logshare-guard/actions/runs/43711757313) passed all six matrix jobs with evidence artifacts for `0052c477861a14c1853b2c8bc4dee08fc5635d43`. Re-run checks for later code changes.
 - [ ] Verify diagnostics contain no fixture secrets and input files remain unchanged. Use invented values and fresh output paths throughout.
 
 ### Factual accuracy
 
 - [ ] Describe 0.1.0 source and the affected 0.2.0 development snapshot separately from the fixed maintained 0.2.0 source.
 - [ ] Confirm the distribution history. Do not label source metadata as a published PyPI release or invent download counts, users, or incidents.
-- [ ] State root cause, preconditions, consequence, and limits. Treat CWE-180 as proposed until reviewed; do not invent a numeric severity score.
+- [x] State root cause, preconditions, consequence, and limits. CWE-180 was selected in the published GHSA on 2026-11-15 and remains subject to CNA review; no numeric severity score is asserted.
 - [ ] Confirm the bug was not deliberately inserted as an educational/training vulnerability. The maintainer's factual history matters; document it if questioned rather than inferring intent from tests.
 - [ ] Preserve the existing individual-maintainer and AI-assistance attribution. Any organizational credit must correspond to real work and dates.
 
 ### Submission
 
-- [ ] Inspect the existing GHSA's private request/reservation state and any correspondence, with the maintainer's authorization, before requesting a CVE.
+- [x] Inspect the existing GHSA's authenticated request state before requesting a CVE. Submission was verified on 2026-11-15 by the UI confirmation and [request timeline event](https://github.com/345sugar/logshare-guard/security/advisories/GHSA-8mpg-mvq9-qm96#event-1368234). Disclose any other request or reservation history that becomes known to the assigned CNA.
 - [ ] Provide the relevant public advisory, full source identifiers, fix, and a reproducible evidence report to the appropriate CNA.
 - [ ] Resolve ambiguous source-version fields with the CNA; avoid a misleading blanket affected-version range.
-- [ ] Record the CNA's actual response and any assigned identifier. Do not describe a draft, reserved identifier, or submission as an accepted published CVE.
+- [ ] Record the CNA's actual response and any assigned identifier. Only request confirmation has been observed so far; no CVE number or acceptance is recorded.
 - [ ] Keep CVE assignment separate from any later organization's access-program application or company-credential claim.
 
 ## Primary references
