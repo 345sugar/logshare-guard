@@ -20,6 +20,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ matrix.python }}
@@ -27,3 +28,15 @@ jobs:
         run: python -m pip install .
       - name: Run offline unit tests against installed package
         run: python -m unittest discover -s tests -v
+      - name: Reproduce published advisory against historical and current source
+        run: python tools/reproduce_url_control_advisory.py --output security-evidence/url-controls.json
+      - name: Reproduce query-separator regression and repair
+        run: python tools/reproduce_query_separator.py --output security-evidence/query-separator.json
+      - name: Retain differential security evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-evidence-${{ matrix.os }}-py${{ matrix.python }}
+          path: security-evidence/*.json
+          if-no-files-found: error
+          retention-days: 30

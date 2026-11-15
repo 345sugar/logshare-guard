@@ -51,6 +51,7 @@ python -m logshare_guard redact input.json -o shared.redacted.json --secret-key 
 `--secret-key` は複数回指定できます。拡張子が `.jsonl` / `.ndjson` なら
 JSONL、それ以外はJSONとして読みます。明示するときは `--format jsonl` を使います。
 UTF-8（BOMありも可）、1ファイル最大32 MiB。JSONLの空行は省きます。
+JSONLのレコード境界はLF（CRLFも可）です。文字列内のUnicode改行文字は保持します。
 JSONの重複キー、NaN / Infinity、浮動小数点の範囲を超える数値、
 不正な文字コード・JSON、深すぎる構造はエラーにします。
 
@@ -129,6 +130,9 @@ JSON設定ファイルの `token` フィールドや、既に伏せた値も検�
 - `{"name":"Authorization","value":"..."}` 形式の値にも対応。
 - 文字列全体がHTTP(S) URLの場合、ユーザー情報を除去し、機密クエリ値と
   fragmentを置換。重複クエリ、エンコードされたキー、`;` 区切りも検査。
+- クエリはまず `&` で区切って検査。機密キーの値に含まれる `;` 以降も丸ごと置換。
+  旧式の `;` 区切りで機密キーが見つかった場合も、次の `&` まで置換するため、
+  解釈が曖昧な後続の公開パラメーターが一緒に伏字になることがあります。
 - 解析できないHTTP(S) URL候補は文字列全体を置換。
 - 先頭のC0制御文字や、スキーム内のTAB・CR・LFでHTTP(S)が隠れる場合も
   URL候補として検査し、制御文字を含む元の文字列全体を置換。
@@ -156,6 +160,18 @@ URLの表記・JSONの空白やエスケープは変化することがありま�
 マスキング済みの途中ファイルが残る可能性があります。
 
 ## 開発と検証
+
+公開済みのURL伏字漏れについて、修正前後の挙動を検証できる資料を
+[セキュリティ調査資料](docs/security/README.md) にまとめています。
+完全なGit履歴のある作業コピーで、架空データだけを使って再検証できます。
+
+```console
+python tools/reproduce_url_control_advisory.py --output security-evidence/url-controls.json
+```
+
+出力には対象コミット、ソースのハッシュ、実行環境、期待結果との比較が含まれます。
+既存のレポートは上書きしないため、再実行時は新しい出力名を指定してください。
+この検証はCVEの採番や外部監査を意味するものではありません。
 
 保守担当は [345sugar](https://github.com/345sugar) です。
 通常の不具合・改善提案は [Issues](https://github.com/345sugar/logshare-guard/issues)、

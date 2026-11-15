@@ -119,15 +119,32 @@ def redact(
                 netloc = netloc.rsplit("@", 1)[1]
                 url_counts["url_userinfo"] += 1
 
-            # Preserve the spelling of unrelated query parameters. Recognize
-            # semicolon separators conservatively as well as ampersands.
-            query_parts = re.split(r"([&;])", parts.query)
-            for index in range(0, len(query_parts), 2):
-                raw_key, _, _raw_value = query_parts[index].partition("=")
+            # First honor ampersand-delimited query fields: a literal semicolon
+            # can be part of either a key or its value. Splitting on both at
+            # once can leave a secret value's semicolon suffix unredacted.
+            query_parts = parts.query.split("&")
+            marker = quote(REDACTED, safe="")
+            for index, field in enumerate(query_parts):
+                raw_key, _, _raw_value = field.partition("=")
                 key = unquote_plus(raw_key, errors="strict")
                 if _normalize_key(key) in sensitive_keys:
-                    query_parts[index] = f"{raw_key}={quote(REDACTED, safe='')}"
+                    query_parts[index] = f"{raw_key}={marker}"
                     url_counts["url_query"] += 1
+                    continue
+
+                # Also recognize legacy semicolon-separated fields. Once a
+                # sensitive key is found, redact through the next ampersand:
+                # following semicolons might belong to the secret value.
+                legacy_fields = field.split(";")
+                for legacy_index, legacy_field in enumerate(legacy_fields):
+                    legacy_key, _, _legacy_value = legacy_field.partition("=")
+                    key = unquote_plus(legacy_key, errors="strict")
+                    if _normalize_key(key) in sensitive_keys:
+                        query_parts[index] = ";".join(
+                            legacy_fields[:legacy_index] + [f"{legacy_key}={marker}"]
+                        )
+                        url_counts["url_query"] += 1
+                        break
 
             fragment = parts.fragment
             if "#" in candidate:
@@ -135,7 +152,7 @@ def redact(
                 url_counts["url_fragment"] += 1
 
             result = urlunsplit(
-                (parts.scheme, netloc, parts.path, "".join(query_parts), fragment)
+                (parts.scheme, netloc, parts.path, "&".join(query_parts), fragment)
             )
         except (ValueError, UnicodeError):
             return replace("invalid_url")

@@ -1,5 +1,18 @@
 # Security policy / セキュリティ方針
 
+## Published advisories / 公開済みの情報
+
+- [GHSA-8mpg-mvq9-qm96](https://github.com/345sugar/logshare-guard/security/advisories/GHSA-8mpg-mvq9-qm96):
+  HTTP(S) URL control-character classification bypass in source version 0.1.0;
+  fixed in source 0.1.1 and retained in maintained 0.2.0.
+- [Review dossier](docs/security/README.md): exact commits, threat model,
+  differential reproduction, and CVE submission material. A prepared submission
+  is not an assigned CVE, and maintainer/AI-assisted checks are not an independent
+  assessment.
+
+公開済みの問題の影響範囲・修正・再現方法は上記資料で確認できます。
+新しい報告は以下の非公開連絡手順に従ってください。
+
 ## Maintainer / 保守担当
 
 [345sugar](https://github.com/345sugar) maintains logshare-guard, including the

@@ -51,6 +51,8 @@ Use `--format json` or `--format jsonl` to override this for every input.
 Files must be UTF-8, optionally with a BOM, and no larger than 32 MiB each.
 Blank JSONL lines are skipped. Duplicate keys, NaN/Infinity, overflowing floating
 point numbers, invalid encoding or JSON, and excessively nested structures fail.
+JSONL records are delimited by LF (CRLF is also accepted). Unicode line-separator
+characters inside JSON strings are preserved as data.
 
 | Exit code | Meaning |
 | --- | --- |
@@ -128,6 +130,10 @@ to its reviewed full SHA. Do not refer to a release tag that does not exist.
 - Whole-string HTTP(S) URLs: user information is removed; selected query values
   and fragments are redacted. Duplicate query keys, encoded keys, and `;`
   separators are handled. Invalid HTTP(S) URL candidates are replaced entirely.
+- Query fields are checked at `&` boundaries first. Sensitive values include
+  literal semicolon suffixes. A sensitive field found by legacy `;` parsing
+  masks through the next `&` boundary as well; this can also remove later public
+  parameters when separator interpretation is ambiguous.
 - URL candidates hidden by leading C0 control characters or TAB/CR/LF within
   the scheme are also recognized; the original malformed string is replaced
   entirely.
@@ -154,6 +160,19 @@ so review it before sharing. File permissions follow the execution environment.
 A failed disk write can leave a partially written, redacted output file.
 
 ## Development
+
+The [security evidence dossier](docs/security/README.md) documents the published
+URL redaction bypass, its repair, and the scope of the evidence. In a working
+copy with full Git history, reproduce the historical and current behavior:
+
+```console
+python tools/reproduce_url_control_advisory.py --output security-evidence/url-controls.json
+```
+
+The report records commit identifiers, source hashes, execution environment,
+and expected-versus-observed results. It uses only synthetic local inputs and
+never overwrites an existing report; choose a new output name for another run.
+This validation does not establish CVE assignment or independent audit status.
 
 Tests use synthetic values, without network calls, real logs, or working
 credentials. From the repository, without installing:

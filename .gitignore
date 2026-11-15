@@ -9,3 +9,4 @@ dist/
 *.redacted.jsonl
 local-logs/
 .env
+security-evidence/

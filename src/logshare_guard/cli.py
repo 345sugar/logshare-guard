@@ -60,7 +60,9 @@ def _read_records(path, format_name):
     if format_name == "json":
         return [_parse(text)], format_name
     records = []
-    for line in text.splitlines():
+    # JSONL records end at physical LF (including CRLF). Unicode line and
+    # paragraph separators are valid JSON string data, not record boundaries.
+    for line in text.split("\n"):
         if line.strip():
             records.append(_parse(line))
     if not records:

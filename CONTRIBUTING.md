@@ -25,6 +25,12 @@ No runtime dependencies are required. Tests must use synthetic inputs and stay
 offline. The CI matrix covers Python 3.11–3.13 on Windows and Linux; a local
 passing result does not imply every CI job passed.
 
+For security changes, also run the [differential reproducer](docs/security/README.md)
+from a full Git clone. It must demonstrate the historical failure as well as the
+fixed behavior, preserve unaffected data, and fail if the repair regresses.
+Do not replace observed evidence with claims about CVE eligibility, real-world
+adoption, or severity that have not been established.
+
 実行時の外部依存はありません。テストには架空の入力を使い、ネットワーク接続を必要と
 しないようにしてください。CIはPython 3.11〜3.13、Windows/Linuxを対象としています。
 
