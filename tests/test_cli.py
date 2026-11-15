@@ -45,6 +45,94 @@ class CliTests(unittest.TestCase):
             {"api_key": "[REDACTED]", "ok": True}])
         self.assertEqual(source.read_text(encoding="utf-8"), original)
 
+    def test_unicode_line_separators_inside_jsonl_strings_are_preserved(self):
+        records = [
+            {"message": "before" + separator + "after", "token": "SYNTHETIC_TOKEN"}
+            for separator in ("\u0085", "\u2028", "\u2029")
+        ]
+        for index, line_ending in enumerate(("\n", "\r\n")):
+            with self.subTest(line_ending=repr(line_ending)):
+                source = self.root / f"unicode-{index}.jsonl"
+                output = self.root / f"unicode-{index}.redacted.jsonl"
+                original = (line_ending.join(
+                    json.dumps(record, ensure_ascii=False) for record in records
+                ) + line_ending).encode("utf-8")
+                source.write_bytes(original)
+
+                code, out, err = self.run_cli("check", source)
+                self.assertEqual(code, 1)
+                self.assertEqual(json.loads(out)["records"], 3)
+                self.assertEqual(json.loads(out)["rules"], {"sensitive_key": 3})
+                self.assertEqual(err, "")
+                self.assertNotIn("SYNTHETIC_TOKEN", out)
+
+                code, out, err = self.run_cli("redact", source, "-o", output)
+                self.assertEqual(code, 0)
+                result = [json.loads(line) for line in
+                          output.read_text(encoding="utf-8").split("\n") if line]
+                self.assertEqual(result, [
+                    {"message": record["message"], "token": "[REDACTED]"}
+                    for record in records
+                ])
+                self.assertEqual(err, "")
+                self.assertNotIn("SYNTHETIC_TOKEN", output.read_text(encoding="utf-8") + out)
+                self.assertEqual(source.read_bytes(), original)
+
+    def test_unescaped_physical_newline_inside_jsonl_string_is_rejected(self):
+        for index, line_ending in enumerate(("\n", "\r\n")):
+            with self.subTest(line_ending=repr(line_ending)):
+                source = self.root / f"invalid-newline-{index}.jsonl"
+                output = self.root / f"invalid-newline-{index}.redacted.jsonl"
+                original = ('{"token":"SYNTHETIC_TOKEN"}' + line_ending
+                            + '{"message":"before' + line_ending
+                            + 'after","token":"SYNTHETIC_TOKEN"}' + line_ending)
+                source.write_bytes(original.encode("utf-8"))
+                code, out, err = self.run_cli("redact", source, "-o", output)
+                self.assertEqual(code, 2)
+                self.assertEqual(out, "")
+                self.assertFalse(output.exists())
+                self.assertNotIn("SYNTHETIC_TOKEN", err)
+                self.assertEqual(source.read_bytes(), original.encode("utf-8"))
+
+    def test_semicolon_query_secrets_are_detected_and_completely_redacted(self):
+        source_data = {
+            "urls": [
+                "https://example.test/?password=SYNTHETIC_PREFIX;SYNTHETIC_SUFFIX&view=public",
+                "https://example.test/?api;key=SYNTHETIC_SECRET",
+                "https://example.test/?view=public;token=SYNTHETIC_PREFIX;SYNTHETIC_SUFFIX&keep=ok",
+                "https://example.test/?tenant;credential=SYNTHETIC_CUSTOM;SYNTHETIC_SUFFIX",
+            ],
+            "public_url": "https://example.test/?view=public;theme=dark",
+        }
+        expected = {
+            "urls": [
+                "https://example.test/?password=%5BREDACTED%5D&view=public",
+                "https://example.test/?api;key=%5BREDACTED%5D",
+                "https://example.test/?view=public;token=%5BREDACTED%5D&keep=ok",
+                "https://example.test/?tenant;credential=%5BREDACTED%5D",
+            ],
+            "public_url": source_data["public_url"],
+        }
+        for extension in ("json", "jsonl"):
+            with self.subTest(extension=extension):
+                source = self.root / f"semicolon.{extension}"
+                output = self.root / f"semicolon.redacted.{extension}"
+                original = (json.dumps(source_data) + "\n").encode("utf-8")
+                source.write_bytes(original)
+                options = ("--secret-key", "tenant_credential")
+                code, out, err = self.run_cli("check", source, *options)
+                self.assertEqual(code, 1)
+                self.assertEqual(json.loads(out)["rules"], {"url_query": 4})
+                self.assertEqual(err, "")
+                self.assertNotIn("SYNTHETIC_", out)
+
+                code, out, err = self.run_cli("redact", source, "-o", output, *options)
+                self.assertEqual(code, 0)
+                self.assertEqual(json.loads(output.read_text(encoding="utf-8")), expected)
+                self.assertEqual(err, "")
+                self.assertNotIn("SYNTHETIC_", output.read_text(encoding="utf-8") + out)
+                self.assertEqual(source.read_bytes(), original)
+
     def test_control_obscured_urls_are_detected_and_fully_redacted(self):
         urls = (
             "\x00https://user:SYNTHETIC_PASSWORD@example.test/?api_key=SYNTHETIC_TOKEN",

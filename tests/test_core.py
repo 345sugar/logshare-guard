@@ -155,6 +155,62 @@ class RedactTests(unittest.TestCase):
             [("tag", "one"), ("tag", "two"), ("empty", ""), ("api_key", MARKER)],
         )
 
+    def test_semicolons_in_sensitive_query_values_cannot_leave_secret_suffixes(self):
+        for value in (
+            "synthetic-prefix;synthetic-suffix",
+            ";synthetic-entire-secret",
+            "synthetic-prefix;other=synthetic-suffix;password=synthetic-another",
+            "synthetic-prefix%3Bsynthetic-suffix",
+        ):
+            with self.subTest(value=value):
+                source = f"https://example.test/?password={value}&view=public"
+                result, stats = redact(source)
+                self.assertEqual(parse_qsl(urlsplit(result).query),
+                                 [("password", MARKER), ("view", "public")])
+                self.assertEqual(stats, {"url_query": 1})
+                self.assertNotIn("synthetic-", result)
+
+    def test_literal_and_encoded_semicolons_in_query_keys_are_normalized(self):
+        for key in ("api;key", "pass;word", "api%3Bkey", "%61pi;key"):
+            with self.subTest(key=key):
+                source = f"https://example.test/?{key}=synthetic-secret&view=public"
+                result, stats = redact(source)
+                parsed = parse_qsl(urlsplit(result).query)
+                self.assertEqual(parsed[0][1], MARKER)
+                self.assertEqual(parsed[1], ("view", "public"))
+                self.assertEqual(stats, {"url_query": 1})
+                self.assertNotIn("synthetic-secret", result)
+
+    def test_legacy_semicolon_query_redaction_covers_the_ambiguous_remainder(self):
+        source = ("https://example.test/?view=public;token=synthetic-first"
+                  ";other=synthetic-tail;password=synthetic-second&keep=ok")
+        result, stats = redact(source)
+        self.assertEqual(result, "https://example.test/?view=public;token=%5BREDACTED%5D&keep=ok")
+        self.assertEqual(stats, {"url_query": 1})
+        self.assertNotIn("synthetic-", result)
+
+    def test_semicolon_policy_applies_to_custom_and_duplicate_query_keys(self):
+        source = ("https://example.test/?tenant;credential=synthetic-one;synthetic-tail"
+                  "&view=public;tenant_credential=synthetic-two;synthetic-rest"
+                  "&%74enant_credential=synthetic-three%3Bsynthetic-end&keep=ok")
+        unchanged, no_stats = redact(source)
+        self.assertEqual(unchanged, source)
+        self.assertEqual(no_stats, {})
+
+        result, stats = redact(source, extra_keys=("tenant_credential",))
+        self.assertEqual(result, "https://example.test/?tenant;credential=%5BREDACTED%5D"
+                         "&view=public;tenant_credential=%5BREDACTED%5D"
+                         "&%74enant_credential=%5BREDACTED%5D&keep=ok")
+        self.assertEqual(stats, {"url_query": 3})
+        self.assertNotIn("synthetic-", result)
+
+    def test_unrelated_query_semicolons_and_similar_key_names_are_unchanged(self):
+        source = ("https://example.test/?view=public;theme=dark&tag=one;two"
+                  "&api_key_hint=public;tokenizer=public")
+        result, stats = redact(source)
+        self.assertEqual(result, source)
+        self.assertEqual(stats, {})
+
     def test_public_url_preserves_encoded_path_and_query_meaning(self):
         source = "https://example.test/a%2Fb?name=hello%20world&count=5"
         result, stats = redact(source)
